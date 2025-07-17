@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>AR Video Demo</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.131.3/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-three.prod.js"></script>
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100%;
+      font-family: sans-serif;
+      background-color: black;
+    }
+
+    /* Top banner */
+    #top-banner {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      background-color: #b91c1c; /* red-700 */
+      color: white;
+      text-align: center;
+      padding: 16px;
+      font-size: 24px;
+      font-weight: bold;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    /* SG60 text styling */
+    .sg60-text {
+      font-family: 'Arial', sans-serif;
+      font-weight: bold;
+      letter-spacing: 2px;
+    }
+
+    /* Star decoration (Singapore flag-inspired) */
+    .star {
+      width: 20px;
+      height: 20px;
+      background: white;
+      clip-path: polygon(
+        50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%,
+        50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%
+      );
+    }
+
+    /* Crescent moon decoration */
+    .crescent {
+      width: 20px;
+      height: 20px;
+      background: white;
+      border-radius: 50%;
+      position: relative;
+    }
+    .crescent::before {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 6px;
+      width: 16px;
+      height: 16px;
+      background: #b91c1c;
+      border-radius: 50%;
+    }
+
+    /* Red border frame */
+    #ar-frame {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border: 12px solid #dc2626; /* Tailwind red-600 */
+      box-sizing: border-box;
+      z-index: 1;
+      pointer-events: none;
+      background-image: 
+        repeating-linear-gradient(
+          45deg,
+          transparent,
+          transparent 20px,
+          rgba(255, 255, 255, 0.2) 20px,
+          rgba(255, 255, 255, 0.2) 40px
+        );
+    }
+
+    #ar-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    /* Camera toggle button */
+    #controls {
+      position: absolute;
+      bottom: 100px;
+      width: 100%;
+      text-align: center;
+      z-index: 100;
+    }
+
+    #toggle-button {
+      padding: 20px 50px;
+      font-size: 28px;
+      background-color: #dc2626; /* Tailwind red-600 */
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      transition: background-color 0.3s;
+    }
+
+    #toggle-button:hover {
+      background-color: #b91c1c; /* Tailwind red-700 */
+    }
+
+    #video-player {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      display: none;
+      z-index: 999;
+    }
+
+    /* Bottom banner */
+    #footer-banner {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background-color: #b91c1c;
+      color: white;
+      text-align: center;
+      padding: 14px;
+      font-size: 20px;
+      font-weight: bold;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Banner -->
+  <div id="top-banner">
+    <div class="star"></div>
+    <div class="crescent"></div>
+    <span class="sg60-text">Scan to watch SG60 videos</span>
+    <div class="crescent"></div>
+    <div class="star"></div>
+  </div>
+
+  <!-- Red frame overlay -->
+  <div id="ar-frame"></div>
+
+  <!-- AR container -->
+  <div id="ar-container"></div>
+
+  <!-- Video Player -->
+  <video id="video-player" src="video.mp4" loop playsinline webkit-playsinline controls></video>
+
+  <!-- Camera Toggle Button -->
+  <div id="controls">
+    <button id="toggle-button">Start Camera</button>
+  </div>
+
+  <!-- Bottom Footer -->
+  <div id="footer-banner">
+    <div class="star"></div>
+    <span class="sg60-text">brought to you by ITE College West | SG60</span>
+    <div class="star"></div>
+  </div>
+
+<script>
+  const toggleButton = document.getElementById("toggle-button");
+  const videoPlayer = document.getElementById("video-player");
+  const arContainer = document.getElementById("ar-container");
+
+  const videoSources = [
+    "video1.mp4", // Target 0
+    "video2.mp4", // Target 1
+    "video3.mp4", // Target 2
+    "video4.mp4", // Target 3
+    "video5.mp4"  // Target 4
+  ];
+
+  let mindarThree = null;
+  let started = false;
+  let hiddenCameraElements = [];
+  let currentIndex = null;
+
+  toggleButton.addEventListener("click", async () => {
+    if (!started) {
+      toggleButton.textContent = "Stop Camera";
+
+      mindarThree = new window.MINDAR.IMAGE.MindARThree({
+        container: arContainer,
+        imageTargetSrc: "targets.mind"
+      });
+
+      const { renderer, scene, camera } = mindarThree;
+
+      // Create one anchor per target image
+      const anchors = videoSources.map((_, index) => mindarThree.addAnchor(index));
+
+      anchors.forEach((anchor, index) => {
+        anchor.onTargetFound = () => {
+          if (currentIndex !== index) {
+            videoPlayer.src = videoSources[index];
+            videoPlayer.load();
+            currentIndex = index;
+          }
+
+          videoPlayer.style.display = "block";
+          videoPlayer.play();
+
+          // Hide camera feed
+          hiddenCameraElements = arContainer.querySelectorAll("canvas, video");
+          hiddenCameraElements.forEach(el => el.style.display = "none");
+        };
+
+        // Remove pause and hide on target lost to keep video playing
+        anchor.onTargetLost = () => {
+          // Do nothing to keep video playing
+        };
+      });
+
+      await mindarThree.start();
+      started = true;
+
+      renderer.setAnimationLoop(() => {
+        renderer.render(scene, camera);
+      });
+
+    } else {
+      toggleButton.textContent = "Start Camera";
+
+      videoPlayer.pause();
+      videoPlayer.style.display = "none";
+
+      if (hiddenCameraElements.length > 0) {
+        hiddenCameraElements.forEach(el => el.style.display = "block");
+      }
+
+      await mindarThree.stop();
+      mindarThree = null;
+      started = false;
+      currentIndex = null;
+    }
+  });
+
+  // Ensure video continues playing if paused while camera is active
+  videoPlayer.addEventListener("pause", () => {
+    if (started && currentIndex !== null) {
+      videoPlayer.play();
+    }
+  });
+</script>
+
+</body>
+</html>
