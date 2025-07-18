@@ -31,47 +31,6 @@
       font-size: 24px;
       font-weight: bold;
       z-index: 1000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-    }
-
-    /* SG60 text styling */
-    .sg60-text {
-      font-family: 'Arial', sans-serif;
-      font-weight: bold;
-      letter-spacing: 2px;
-    }
-
-    /* Star decoration (Singapore flag-inspired) */
-    .star {
-      width: 20px;
-      height: 20px;
-      background: white;
-      clip-path: polygon(
-        50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%,
-        50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%
-      );
-    }
-
-    /* Crescent moon decoration */
-    .crescent {
-      width: 20px;
-      height: 20px;
-      background: white;
-      border-radius: 50%;
-      position: relative;
-    }
-    .crescent::before {
-      content: '';
-      position: absolute;
-      top: 2px;
-      left: 6px;
-      width: 16px;
-      height: 16px;
-      background: #b91c1c;
-      border-radius: 50%;
     }
 
     /* Red border frame */
@@ -85,28 +44,20 @@
       box-sizing: border-box;
       z-index: 1;
       pointer-events: none;
-      background-image: 
-        repeating-linear-gradient(
-          45deg,
-          transparent,
-          transparent 20px,
-          rgba(255, 255, 255, 0.2) 20px,
-          rgba(255, 255, 255, 0.2) 40px
-        );
     }
 
-    #ar-container {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-    }
+#ar-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
 
     /* Camera toggle button */
     #controls {
@@ -157,23 +108,13 @@
       font-size: 20px;
       font-weight: bold;
       z-index: 1000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
     }
   </style>
 </head>
 <body>
 
   <!-- Top Banner -->
-  <div id="top-banner">
-    <div class="star"></div>
-    <div class="crescent"></div>
-    <span class="sg60-text">Scan to watch SG60 videos</span>
-    <div class="crescent"></div>
-    <div class="star"></div>
-  </div>
+  <div id="top-banner">Scan to watch videos</div>
 
   <!-- Red frame overlay -->
   <div id="ar-frame"></div>
@@ -190,11 +131,7 @@
   </div>
 
   <!-- Bottom Footer -->
-  <div id="footer-banner">
-    <div class="star"></div>
-    <span class="sg60-text">brought to you by ITE College West | SG60</span>
-    <div class="star"></div>
-  </div>
+  <div id="footer-banner">brought to you by ITE College West</div>
 
 <script>
   const toggleButton = document.getElementById("toggle-button");
@@ -244,9 +181,12 @@
           hiddenCameraElements.forEach(el => el.style.display = "none");
         };
 
-        // Remove pause and hide on target lost to keep video playing
         anchor.onTargetLost = () => {
-          // Do nothing to keep video playing
+          videoPlayer.pause();
+          videoPlayer.style.display = "none";
+
+          // Show camera feed again
+          hiddenCameraElements.forEach(el => el.style.display = "block");
         };
       });
 
@@ -273,14 +213,9 @@
       currentIndex = null;
     }
   });
-
-  // Ensure video continues playing if paused while camera is active
-  videoPlayer.addEventListener("pause", () => {
-    if (started && currentIndex !== null) {
-      videoPlayer.play();
-    }
-  });
 </script>
+
+  
 
 </body>
 </html>
