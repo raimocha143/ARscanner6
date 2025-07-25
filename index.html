@@ -12,15 +12,16 @@
   <style>
     html, body {
       margin: 0;
+    /* Hide MindAR built-in scan line overlays and white square/corners */
+    .mindar-ui-overlay,
+    canvas.mindar-ui-overlay {
+      display: none !important;
+    }
       padding: 0;
       overflow: hidden;
       height: 100%;
       font-family: sans-serif;
       background-color: black;
-    }
-    .mindar-ui-overlay,
-    canvas.mindar-ui-overlay {
-      display: none !important;
     }
     #top-banner {
       position: fixed;
@@ -65,8 +66,7 @@
       text-align: center;
       z-index: 100;
     }
-    #toggle-button,
-    #close-button {
+    #toggle-button {
       padding: 20px 50px;
       font-size: 28px;
       background-color: #dc2626;
@@ -76,18 +76,16 @@
       cursor: pointer;
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
       transition: background-color 0.3s;
-      margin: 10px;
     }
-    #toggle-button:hover,
-    #close-button:hover {
+    #toggle-button:hover {
       background-color: #b91c1c;
     }
     #video-player {
       position: absolute;
-      top: 56px;
+      top: 56px; /* Height of #top-banner (16px padding + 24px font + ~16px extra) */
       left: 0;
       width: 100%;
-      bottom: 54px;
+      bottom: 54px; /* Height of #footer-banner (14px padding + 20px font + ~20px extra) */
       height: calc(100% - 56px - 54px);
       object-fit: contain;
       background: black;
@@ -113,165 +111,144 @@
 </head>
 <body>
   <div style="display:flex;">
+    <!-- Top Banner -->
     <div id="top-banner">Scan to watch videos</div>
+  
+    <!-- Red frame overlay -->
     <div id="ar-frame"></div>
+  
+    <!-- AR container for MindAR -->
     <div id="ar-container"></div>
-
-    <!-- Video Player -->
+  
+    <!-- Video Player (hidden by default) -->
     <video id="video-player" src="CO.mp4" playsinline webkit-playsinline controls></video>
     <video id="video-player" src="MW.mp4" playsinline webkit-playsinline controls></video>
-
-    <!-- Buttons -->
+  
+    <!-- Camera Toggle Button -->
     <div id="controls">
       <button id="toggle-button">Start Camera</button>
-      <button id="close-button" style="display: none;">Close</button>
     </div>
+  
+    <!-- Bottom Footer -->
+    <div id="footer-banner">brought to you by ITE College West</div>    
+  </div>  
+<script>
+  const toggleButton = document.getElementById("toggle-button");
+  const videoPlayer = document.getElementById("video-player");
+  const arContainer = document.getElementById("ar-container");
 
-    <div id="footer-banner">brought to you by ITE College West</div>
-  </div>
+  
+  // List of video sources for each target (expandable for more targets)
+  const videoSources = [
+    "CO.mp4", // Target 0
+    "MW.mp4", // Target 1
+  ];
+  
+  let mindarThree = null;
+  let started = false;
+  let hiddenCameraElements = [];
+  let currentIndex = null;
+  
+  // Hide video when it ends and restore camera feed
+  videoPlayer.addEventListener("ended", () => {
+    videoPlayer.style.display = "none";
+    if (hiddenCameraElements.length > 0) {
+      hiddenCameraElements.forEach(el => el.style.display = "block");
+      hiddenCameraElements = [];
+    }
+  });
 
-  <script>
-    const toggleButton = document.getElementById("toggle-button");
-    const closeButton = document.getElementById("close-button");
-    const videoPlayer = document.getElementById("video-player");
-    const arContainer = document.getElementById("ar-container");
+  toggleButton.addEventListener("click", async () => {
+    if (!started) {
+      toggleButton.textContent = "Stop Camera";
 
-    const videoSources = ["CO.mp4", "MW.mp4"];
+      // Remove any extra MindAR canvas/video elements and scanning overlays from previous runs
+      while (arContainer.firstChild) {
+        arContainer.removeChild(arContainer.firstChild);
+      }
+      // Remove any leftover scanning line overlays (ensure no repeated lines)
+      const oldScanLines = document.querySelectorAll('#ar-container canvas.mindar-ui-overlay');
+      oldScanLines.forEach(el => el.parentNode && el.parentNode.removeChild(el));
 
-    let mindarThree = null;
-    let started = false;
-    let hiddenCameraElements = [];
-    let currentIndex = null;
-    let cameFromVideo = false;
+      mindarThree = new window.MINDAR.IMAGE.MindARThree({
+        container: arContainer,
+        imageTargetSrc: "targets.mind"
+      });
 
-    videoPlayer.addEventListener("ended", () => {
+      const { renderer, scene, camera } = mindarThree;
+
+      // Create one anchor per target image
+      const anchors = videoSources.map((_, index) => mindarThree.addAnchor(index));
+
+      anchors.forEach((anchor, index) => {
+        anchor.onTargetFound = () => {
+          if (currentIndex !== index) {
+            videoPlayer.src = videoSources[index];
+            videoPlayer.load();
+            currentIndex = index;
+          }
+          videoPlayer.style.display = "block";
+          videoPlayer.play();
+
+          // Hide camera feed
+          hiddenCameraElements = arContainer.querySelectorAll("canvas, video");
+          hiddenCameraElements.forEach(el => el.style.display = "none");
+        };
+
+        anchor.onTargetLost = () => {
+          // Optionally restore camera feed if video is not playing
+          if (videoPlayer.paused || videoPlayer.ended) {
+            if (hiddenCameraElements.length > 0) {
+              hiddenCameraElements.forEach(el => el.style.display = "block");
+              hiddenCameraElements = [];
+            }
+          }
+        };
+      });
+
+
+      await mindarThree.start();
+      started = true;
+
+      // Remove all MindAR scanning lines overlays (canvas with class 'mindar-ui-overlay') after start and stop
+      const scanLineCanvases = arContainer.querySelectorALL('canvas.mindar-ui-overlay');
+      scanLineCanvases.forEach(el => el.parentNode && el.parentNode.removeChild(el));
+
+      renderer.setAnimationLoop(() => {
+        renderer.render(scene, camera);
+      });
+
+    } else {
+      toggleButton.textContent = "Start Camera";
+      videoPlayer.pause();
       videoPlayer.style.display = "none";
-      closeButton.style.display = "none";
+      // Restore camera feed if hidden
       if (hiddenCameraElements.length > 0) {
         hiddenCameraElements.forEach(el => el.style.display = "block");
         hiddenCameraElements = [];
       }
-    });
+      // Hide all camera elements before removing them
+      const cameraEls = arContainer.querySelectorAll("canvas, video");
+      cameraEls.forEach(el => el.style.display = "none");
+      // Remove any leftover scanning line overlays
+      const oldScanLines = document.querySelectorAll('#ar-container canvas.mindar-ui-overlay');
+      oldScanLines.forEach(el => el.parentNode && el.parentNode.removeChild(el));
 
-    videoPlayer.addEventListener("play", () => {
-      closeButton.style.display = "inline-block";
-    });
-
-    toggleButton.addEventListener("click", async () => {
-      if (!started) {
-        toggleButton.textContent = "Stop Camera";
-
-        while (arContainer.firstChild) {
-          arContainer.removeChild(arContainer.firstChild);
-        }
-
-        const oldScanLines = document.querySelectorAll('#ar-container canvas.mindar-ui-overlay');
-        oldScanLines.forEach(el => el.parentNode && el.parentNode.removeChild(el));
-
-        mindarThree = new window.MINDAR.IMAGE.MindARThree({
-          container: arContainer,
-          imageTargetSrc: "targets.mind"
-        });
-
-        const { renderer, scene, camera } = mindarThree;
-
-        const anchors = videoSources.map((_, index) => mindarThree.addAnchor(index));
-
-        anchors.forEach((anchor, index) => {
-          anchor.onTargetFound = () => {
-            if (currentIndex !== index) {
-              videoPlayer.src = videoSources[index];
-              videoPlayer.load();
-              currentIndex = index;
-            }
-            videoPlayer.style.display = "block";
-            videoPlayer.play();
-
-            hiddenCameraElements = arContainer.querySelectorAll("canvas, video");
-            hiddenCameraElements.forEach(el => el.style.display = "none");
-            cameFromVideo = true;
-          };
-
-          anchor.onTargetLost = () => {
-            if (videoPlayer.paused || videoPlayer.ended) {
-              if (hiddenCameraElements.length > 0) {
-                hiddenCameraElements.forEach(el => el.style.display = "block");
-                hiddenCameraElements = [];
-              }
-              closeButton.style.display = "none";
-            }
-          };
-        });
-
-        await mindarThree.start();
-        started = true;
-
-        const scanLineCanvases = arContainer.querySelectorAll('canvas.mindar-ui-overlay');
-        scanLineCanvases.forEach(el => el.parentNode && el.parentNode.removeChild(el));
-
-        renderer.setAnimationLoop(() => {
-          renderer.render(scene, camera);
-        });
-
-      } else {
-        toggleButton.textContent = "Start Camera";
-        videoPlayer.pause();
-        videoPlayer.style.display = "none";
-        closeButton.style.display = "none";
-
-        if (hiddenCameraElements.length > 0) {
-          hiddenCameraElements.forEach(el => el.style.display = "block");
-          hiddenCameraElements = [];
-        }
-
-        const cameraEls = arContainer.querySelectorAll("canvas, video");
-        cameraEls.forEach(el => el.style.display = "none");
-
-        const oldScanLines = document.querySelectorAll('#ar-container canvas.mindar-ui-overlay');
-        oldScanLines.forEach(el => el.parentNode && el.parentNode.removeChild(el));
-
-        await mindarThree.stop();
-        if (mindarThree.renderer?.domElement?.parentNode) {
-          mindarThree.renderer.domElement.parentNode.removeChild(mindarThree.renderer.domElement);
-        }
-        mindarThree = null;
-        started = false;
-        currentIndex = null;
-        while (arContainer.firstChild) {
-          arContainer.removeChild(arContainer.firstChild);
-        }
+      await mindarThree.stop();
+      if (mindarThree.renderer && mindarThree.renderer.domElement && mindarThree.renderer.domElement.parentNode) {
+        mindarThree.renderer.domElement.parentNode.removeChild(mindarThree.renderer.domElement);
       }
-    });
-
-    closeButton.addEventListener("click", async () => {
-      if (videoPlayer.style.display === "block") {
-        videoPlayer.pause();
-        videoPlayer.style.display = "none";
-        closeButton.style.display = "none";
-        if (hiddenCameraElements.length > 0) {
-          hiddenCameraElements.forEach(el => el.style.display = "block");
-          hiddenCameraElements = [];
-        }
-        cameFromVideo = true;
-      } else if (started && cameFromVideo) {
-        toggleButton.textContent = "Start Camera";
-        const cameraEls = arContainer.querySelectorAll("canvas, video");
-        cameraEls.forEach(el => el.style.display = "none");
-
-        await mindarThree.stop();
-        if (mindarThree.renderer?.domElement?.parentNode) {
-          mindarThree.renderer.domElement.parentNode.removeChild(mindarThree.renderer.domElement);
-        }
-        mindarThree = null;
-        started = false;
-        currentIndex = null;
-        while (arContainer.firstChild) {
-          arContainer.removeChild(arContainer.firstChild);
-        }
-
-        window.history.back(); // Redirect to previous page
+      mindarThree = null;
+      started = false;
+      currentIndex = null;
+      // Remove all children from arContainer
+      while (arContainer.firstChild) {
+        arContainer.removeChild(arContainer.firstChild);
       }
-    });
-  </script>
+    }
+  });
+</script>
+
 </body>
 </html>
+
