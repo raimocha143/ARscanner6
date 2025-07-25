@@ -96,21 +96,30 @@
     }
     #close-video-btn {
       position: absolute;
-      top: 64px;
-      right: 24px;
+      top: 90px;
+      right: 16px;
       z-index: 1001;
       background: rgba(0,0,0,0.7);
       color: #fff;
       border: none;
       border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      font-size: 24px;
+      width: 80px;
+      height: 80px;
+      font-size: 48px;
       cursor: pointer;
       display: none;
       align-items: center;
       justify-content: center;
       transition: background 0.2s;
+    }
+    @media (max-width: 600px) {
+      #close-video-btn {
+        width: 96px;
+        height: 96px;
+        font-size: 56px;
+        top: 90px;
+        right: 4px;
+      }
     }
     #close-video-btn:hover {
       background: #b91c1c;
@@ -143,6 +152,7 @@
   
     <!-- Video Player (hidden by default) -->
     <video id="video-player" src="CO.mp4" playsinline webkit-playsinline controls></video>
+    <video id="video-player" src="MW.mp4" playsinline webkit-playsinline controls></video>
     <button id="close-video-btn" title="Close Video">&times;</button>
   
     <!-- Camera Toggle Button -->
@@ -163,6 +173,7 @@
   // List of video sources for each target (expandable for more targets)
   const videoSources = [
     "CO.mp4", // Target 0
+    "MW.mp4", // Target 1
   ];
   
   let mindarThree = null;
